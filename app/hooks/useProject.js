@@ -17,7 +17,6 @@ export default function useProject() {
     const [selectedTaskForGuidance, setSelectedTaskForGuidance] = useState(null);
     const [isGuidanceModalOpen, setIsGuidanceModalOpen] = useState(false);
     const [activeMilestoneIndex, setActiveMilestoneIndex] = useState(0);
-    const [emphasizedTaskIds, setEmphasizedTaskIds] = useState([]);
     const [agentTrace, setAgentTrace] = useState([]);
     const [chatMessages, setChatMessages] = useState([]);
     const chatMessagesRef = useRef(null);
@@ -120,11 +119,6 @@ export default function useProject() {
                 if (action.payload?.tab) setActiveTab(action.payload.tab);
                 if (action.payload?.milestoneIndex !== undefined) setActiveMilestoneIndex(action.payload.milestoneIndex);
                 break;
-            case 'EMPHASIZE':
-                if (action.payload?.task_id) {
-                    setEmphasizedTaskIds(prev => [...new Set([...prev, action.payload.task_id])]);
-                }
-                break;
             case 'TOAST':
                 addToast(action.payload?.message, action.payload?.type || 'info');
                 break;
@@ -144,29 +138,12 @@ export default function useProject() {
                 body: JSON.stringify({ goal_text: goalText, optional_deadline: optionalDeadline, user_profile: userProfile }),
             });
 
-            const reader = res.body.getReader();
-            const decoder = new TextDecoder();
-            let accumulated = "";
-
             setAgentTrace(["Analyzing your request...", "Inferring milestones..."]);
             setChatInput("AI is generating your plan...");
 
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                const chunk = decoder.decode(value, { stream: true });
-                accumulated += chunk;
-                // Periodic feedback
-                if (accumulated.length % 100 === 0) {
-                    setAgentTrace(prev => [...prev, "Structuring data..."]);
-                }
-            }
+            const result = await res.json();
+            if (res.status !== 200) throw new Error(result.error || 'Failed to infer goal');
 
-            let responseText = accumulated.trim();
-            if (responseText.startsWith('```json')) responseText = responseText.slice(7, -3).trim();
-            else if (responseText.startsWith('```')) responseText = responseText.slice(3, -3).trim();
-
-            const result = JSON.parse(responseText);
             setData(result);
             await syncWithDB(result);
             addToast('Goal inferred! Building blueprint...', 'success');
@@ -181,31 +158,28 @@ export default function useProject() {
     };
 
     const handleDecompose = async (inputData = null) => {
-        const sourceData = inputData || data;
+        // If inputData is an event object (e.g. from onClick), ignore it and use internal data
+        const sourceData = (inputData && (inputData.nativeEvent || inputData.target)) ? data : (inputData || data);
         setLoading(true);
         try {
+            setAgentTrace(prev => [...prev, "Generating blueprint..."]);
             const res = await fetch('/api/decomposition', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ goal_struct: sourceData, max_milestones: 5 }),
+                body: JSON.stringify({
+                    goal_struct: sourceData,
+                    max_milestones: 5,
+                    deadline: sourceData.deadline || optionalDeadline,
+                    user_availability: {
+                        hours_per_day: userProfile.avg_hours_per_day,
+                        workdays: userProfile.workdays
+                    }
+                }),
             });
 
-            const reader = res.body.getReader();
-            const decoder = new TextDecoder();
-            let accumulated = "";
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                accumulated += decoder.decode(value, { stream: true });
-            }
-
-            let responseText = accumulated.trim();
-            if (responseText.startsWith('```json')) responseText = responseText.slice(7, -3).trim();
-            else if (responseText.startsWith('```')) responseText = responseText.slice(3, -3).trim();
-
-            const result = JSON.parse(responseText);
-            const newData = { ...sourceData, milestones: result.milestones };
+            const result = await res.json();
+            if (res.status !== 200) throw new Error(result.error || 'Decomposition failed');
+            const newData = { ...sourceData, ...result };
             setData(newData);
             await syncWithDB(newData);
             addToast('Plan generated! Scheduling tasks...', 'success');
@@ -268,12 +242,6 @@ export default function useProject() {
                 setSelectedTaskForGuidance(taskObj);
                 setIsGuidanceModalOpen(true);
             }
-        } else if (action === 'emphasize') {
-            const updatedEmphasized = emphasizedTaskIds.includes(taskId)
-                ? emphasizedTaskIds.filter(id => id !== taskId)
-                : [...emphasizedTaskIds, taskId];
-            setEmphasizedTaskIds(updatedEmphasized);
-            addToast(emphasizedTaskIds.includes(taskId) ? 'Task de-emphasized' : 'Task emphasized!', 'info');
         }
     };
 
@@ -284,10 +252,6 @@ export default function useProject() {
             user_availability: { workdays: userProfile.workdays, hours_per_day: userProfile.avg_hours_per_day, blackouts: [] },
             user_instruction: instruction
         });
-    };
-
-    const handleUndo = () => {
-        // Obsolete
     };
 
     const handleSwitchProject = (id) => {
@@ -301,7 +265,6 @@ export default function useProject() {
         setData(resetData);
         setProjectId(null);
         setProgressUpdates([]);
-        setEmphasizedTaskIds([]);
         setGoalText('');
         setOptionalDeadline('');
 
@@ -352,37 +315,19 @@ Provide a helpful, concise response. If the user asks about specific tasks or pr
 
             if (!res.ok) throw new Error('API request failed');
 
-            const reader = res.body.getReader();
-            const decoder = new TextDecoder();
-            let accumulated = "";
+            const result = await res.json();
+            const content = typeof result === 'string' ? result : (result.content || result.response || JSON.stringify(result));
 
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                const chunk = decoder.decode(value, { stream: true });
-                accumulated += chunk;
-
-                setChatMessages(prev => {
-                    const next = [...prev];
-                    // Find the last assistant message to update
-                    for (let i = next.length - 1; i >= 0; i--) {
-                        if (next[i].role === 'assistant') {
-                            next[i] = { ...next[i], content: accumulated };
-                            break;
-                        }
+            setChatMessages(prev => {
+                const next = [...prev];
+                for (let i = next.length - 1; i >= 0; i--) {
+                    if (next[i].role === 'assistant') {
+                        next[i] = { ...next[i], content: content };
+                        break;
                     }
-                    return next;
-                });
-
-                if (accumulated.length % 50 === 0) {
-                    setAgentTrace(prev => {
-                        const last = prev[prev.length - 1];
-                        if (last === "Streaming response...") return prev;
-                        return [...prev, "Streaming response..."];
-                    });
                 }
-            }
+                return next;
+            });
             setAgentTrace(prev => [...prev, "Query complete."]);
             setTimeout(() => setAgentTrace([]), 3000);
         } catch (err) {
@@ -405,7 +350,7 @@ Provide a helpful, concise response. If the user asks about specific tasks or pr
         data, loading, projectId, projects, progressUpdates, toasts, activeTab, setActiveTab,
         chatInput, setChatInput, selectedTaskForGuidance, setSelectedTaskForGuidance,
         isGuidanceModalOpen, setIsGuidanceModalOpen, activeMilestoneIndex, setActiveMilestoneIndex,
-        emphasizedTaskIds, agentTrace, chatMessages, chatMessagesRef,
+        agentTrace, chatMessages, chatMessagesRef,
         handleInferGoal, handleDecompose, handleSchedule, handleTaskAction, handleReplan,
         handleSwitchProject, handleNewProject, handleChatSubmit, toggleWorkday, removeToast
     };

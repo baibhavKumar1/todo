@@ -1,8 +1,7 @@
 'use client';
 import FocusCard from '../components/FocusCard';
-import EmphasizedSection from '../components/EmphasizedSection';
 
-export default function FocusView({ currentTask, progressUpdates, onTaskAction, emphasizedTasks, scheduledTasks }) {
+export default function FocusView({ currentTask, progressUpdates, onTaskAction, scheduledTasks }) {
     const isCompletedMap = progressUpdates.reduce((acc, p) => {
         if (p.status === 'done') acc[p.task_id] = true;
         return acc;
@@ -17,14 +16,6 @@ export default function FocusView({ currentTask, progressUpdates, onTaskAction, 
                 onAction={onTaskAction}
                 isStalled={isStalled}
             />
-            {emphasizedTasks.length > 0 && (
-                <EmphasizedSection
-                    tasks={emphasizedTasks}
-                    onAction={onTaskAction}
-                    isCompletedMap={isCompletedMap}
-                    scheduledTasks={scheduledTasks}
-                />
-            )}
         </div>
     );
 }

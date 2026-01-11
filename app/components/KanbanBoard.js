@@ -2,7 +2,7 @@
 
 import TaskCard from './TaskCard';
 
-export default function KanbanBoard({ milestones, scheduledTasks = [], progressUpdates = [], emphasizedTaskIds = [], onTaskAction }) {
+export default function KanbanBoard({ milestones, scheduledTasks = [], progressUpdates = [], onTaskAction }) {
     if (!milestones || milestones.length === 0) return null;
 
     const isTaskCompleted = (taskId) => {
@@ -25,7 +25,7 @@ export default function KanbanBoard({ milestones, scheduledTasks = [], progressU
                                     }`}>
                                     {mIdx + 1}
                                 </span>
-                                <h3 className="font-semibold text-slate-100 tracking-tight leading-tight group-hover:text-indigo-400 transition-colors">
+                                <h3 className="font-semibold text-slate-100 tracking-tight leading-tight  transition-colors">
                                     {milestone.title}
                                 </h3>
                             </div>
@@ -71,12 +71,11 @@ export default function KanbanBoard({ milestones, scheduledTasks = [], progressU
                                     {milestoneTasks.map((task) => {
                                         const scheduledTask = scheduledTasks.find(st => st.task_id === task.id);
                                         return (
-                                            <div key={task.id} className="min-w-[300px] max-w-[300px] snap-start">
+                                            <div key={task.id} className="min-w-[350px] max-w-[350px] snap-start">
                                                 <TaskCard
                                                     task={task}
                                                     onAction={onTaskAction}
                                                     isCompleted={isTaskCompleted(task.id)}
-                                                    isEmphasized={emphasizedTaskIds.includes(task.id)}
                                                     date={scheduledTask?.date}
                                                 />
                                             </div>

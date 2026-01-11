@@ -1,12 +1,12 @@
 'use client';
 
-export default function Header({ projectId, projects, handleSwitchProject }) {
+export default function Header({ projectId, projects, handleSwitchProject, activeTab, setActiveTab }) {
     return (
         <header className="sticky top-0 z-40 bg-slate-950/80 backdrop-blur-xl border-b border-slate-900">
             <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                    <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-semibold shadow-indigo-500/20 shadow-lg">
-                        AI
+                    <div className="p-4 py-1 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-semibold shadow-indigo-500/20 shadow-lg">
+                        AI Todo
                     </div>
 
                     <div className="relative group">
@@ -27,7 +27,19 @@ export default function Header({ projectId, projects, handleSwitchProject }) {
                     </div>
                 </div>
 
-                <div className="w-8" /> {/* Spacer */}
+                <nav className="hidden md:flex gap-1 bg-slate-900/50 border border-slate-800/50 p-1 rounded-xl">
+                    {['focus', 'plan', 'schedule', 'stats', 'settings'].map(tab => (
+                        <button
+                            key={tab}
+                            onClick={() => setActiveTab(tab)}
+                            className={`py-2 px-4 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all duration-300 ${activeTab === tab ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}
+                        >
+                            {tab}
+                        </button>
+                    ))}
+                </nav>
+
+                <div className="w-8 md:hidden" /> {/* Mobile Spacer */}
             </div>
         </header>
     );

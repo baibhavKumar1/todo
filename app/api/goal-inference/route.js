@@ -1,4 +1,5 @@
 const { createDefaultProviderFactory } = require('../../../lib/ai-providers/provider-factory');
+export const maxDuration = 300;
 
 export async function POST(req) {
   try {
@@ -50,7 +51,7 @@ Example OUT:
     const providerFactory = createDefaultProviderFactory();
     const model = process.env.OPENROUTER_MODEL || 'openai/gpt-oss-20b:free';
 
-    const stream = await providerFactory.generateContentStream({
+    const response = await providerFactory.generateContent({
       prompt: prompt,
       model: model,
       options: {
@@ -60,25 +61,17 @@ Example OUT:
       },
     });
 
-    // Create a TransformStream to handle the AI response chunks
-    const encoder = new TextEncoder();
-    const transformStream = new TransformStream({
-      async transform(chunk, controller) {
-        // The chunk from OpenRouter SDK is typically an object with choices[0].delta.content
-        const content = chunk.choices?.[0]?.delta?.content || "";
-        if (content) {
-          controller.enqueue(encoder.encode(content));
-        }
-      },
-    });
+    let jsonResponse;
+    try {
+      let responseText = response.text.trim();
+      if (responseText.startsWith('```json')) responseText = responseText.slice(7, -3).trim();
+      else if (responseText.startsWith('```')) responseText = responseText.slice(3, -3).trim();
+      jsonResponse = JSON.parse(responseText);
+    } catch (error) {
+      throw new Error('Failed to parse goal inference JSON: ' + response.text);
+    }
 
-    return new Response(stream.pipeThrough(transformStream), {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-      },
-    });
+    return Response.json(jsonResponse);
   } catch (error) {
     console.error('Error in goal-inference:', error);
     return Response.json(

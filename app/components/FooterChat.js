@@ -20,15 +20,15 @@ export default function FooterChat({ chatMessages, chatMessagesRef, agentTrace, 
                 )}
 
                 {agentTrace.length > 0 && (
-                    <div className="mx-8 mb-4 p-4 bg-slate-900/50 border border-slate-800 rounded-2xl animate-in slide-in-from-bottom-2 duration-300">
+                    <div className="absolute bottom-0 right-0 mx-4 mb-4 p-4 bg-slate-900 border border-slate-800 rounded-xl animate-in slide-in-from-bottom-2 duration-300">
                         <div className="flex items-center gap-2 mb-2">
                             <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse" />
-                            <span className="text-[10px] font-semibold text-indigo-400 uppercase tracking-widest">Agent Trace Log</span>
+                            <span className="text-sm font-semibold text-indigo-400 uppercase tracking-widest">Agent Trace Log</span>
                         </div>
                         <div className="space-y-1">
-                            {agentTrace.slice(-3).map((trace, i) => (
-                                <div key={i} className="text-[10px] text-slate-500 font-semibold flex items-center gap-2">
-                                    <span className="text-slate-700 opacity-50">[{new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}]</span>
+                            {agentTrace.slice(-5).map((trace, i) => (
+                                <div key={i} className="text-xs text-slate-500 font-semibold flex items-center gap-2">
+                                    <span className="text-slate-400 opacity-90">[{new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}]</span>
                                     <span>{trace}</span>
                                 </div>
                             ))}
